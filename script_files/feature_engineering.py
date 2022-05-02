@@ -99,3 +99,15 @@ def missing_values_table(df):
     )
 
     return mz_table
+
+
+def drop_column(df: pd.DataFrame, cols_to_drop: list) -> pd.DataFrame:
+    """Drop specified columns from dataframe
+    Args:
+        df (pd.DataFrame): dataframe containing the zindi data
+        cols_to_drop (list): list of strings identifying the columns to drop
+    Returns:
+        pd.DataFrame: dataframe with dropped columns
+    """
+    df2 = df.drop(cols_to_drop, axis=1, inplace=False)
+    return df2

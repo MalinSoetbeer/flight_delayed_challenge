@@ -16,6 +16,13 @@ def dummie_class(X):
 
 
 def dummie_reg(X):
+    """Dummie regressor that always predicts the same value
 
+    Args:
+        X (DataFrame): Dataframe to do predictions on
+
+    Returns:
+        Series: Series of the same prediction in the length of the passed Dataframe
+    """
     y_pred = [89.38 for _ in range(len(X))]
     return y_pred
