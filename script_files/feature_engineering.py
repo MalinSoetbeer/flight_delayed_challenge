@@ -49,6 +49,7 @@ def create_feature(df: pd.DataFrame) -> pd.DataFrame:
     df["delay_or_onTime"] = df["target"].apply(
         lambda x: "on_time" if x <= 10.0 else "delay"
     )
+    df["delayed"] = df["target"].apply(lambda x: 0 if x <= 10.0 else 1)
     df["domestic"] = (df.country_DEP == df.country_ARR).astype("int")
     df["dep_hour"] = df["STD"].dt.hour
     df["dep_weekday"] = df.STD.dt.day_name()
