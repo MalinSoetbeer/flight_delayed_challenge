@@ -60,3 +60,4 @@ def error_analysis(y_test, y_pred_test):
     ax[1].set_ylabel("residuals")
     ax[1].set_xlim((y_pred_test.min() - 10), (y_pred_test.max() + 10))
     ax[1].set_ylim((residuals.min() - 10), (residuals.max() + 10))
+    plt.show()
