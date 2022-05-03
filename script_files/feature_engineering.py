@@ -111,3 +111,24 @@ def drop_column(df: pd.DataFrame, cols_to_drop: list) -> pd.DataFrame:
     """
     df2 = df.drop(cols_to_drop, axis=1, inplace=False)
     return df2
+
+
+def reset_indices(*args):
+    for i in args:
+        i.reset_index(drop=True, inplace=True)
+
+
+def OneHotEncoder_labels(X_train, columns):
+    one_hot_class = pd.get_dummies(X_train, columns=columns, drop_first=True)
+    one_hot_class = list(one_hot_class.columns)
+    return one_hot_class
+
+
+def Encode_categorical_features(X_train, encoder, columns):
+
+    # Fit OneHotEncoder to X, then transform X. Here Train Data
+    X_train_dummie_columns = pd.DataFrame(encoder.fit_transform(X_train[columns]))
+    X_train_class = X_train.drop(columns, axis=1)
+    X_train_class = X_train.join(X_train_dummie_columns)
+
+    return X_train_class
