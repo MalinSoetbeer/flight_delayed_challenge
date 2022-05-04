@@ -1,61 +1,159 @@
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
-from sklearn.linear_model import LinearRegression
 import pickle
+import sys
 import warnings
-warnings.filterwarnings('ignore')
+from re import X
 
-from feature_engineering import fill_missing_values, drop_column, transform_altitude
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import f1_score, mean_squared_error
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.svm import SVC
 
-# coffee data
-url="https://github.com/jldbc/coffee-quality-database/raw/master/data/robusta_data_cleaned.csv"
-coffee_features=pd.read_csv(url)
+warnings.filterwarnings("ignore")
+RSEED = 42
+# Import airport data
+import airportsdata
 
-# coffee score
+airports = airportsdata.load()
 
-url="https://raw.githubusercontent.com/jldbc/coffee-quality-database/master/data/robusta_ratings_raw.csv"
-coffee_quality=pd.read_csv(url)
+# Import scripts
+from feature_engineering import *
+from prepare_flight_data import *
 
-
-#cleaning data and preparing
-Y = coffee_quality["quality_score"]
-X = coffee_features.select_dtypes(['number'])
+flight_data = sys.argv[1]
 
 
-# splittin into train and test
-X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.30, random_state=42)
-## in order to exemplify how the predict will work.. we will save the y_train
-print("Saving test data in the data folder")
-X_test.to_csv("data/X_test.csv", index=False)
-y_test.to_csv("data/y_test.csv", index=False)
+# Loading the data in and Shape to fit
+airports = pd.DataFrame(airports).T.reset_index(drop=True)
+# test data
+train_df = pd.read_csv(flight_data)
 
 print("Feature engineering on train")
-X_train = transform_altitude(X_train)
-X_train = drop_column(X_train, col_name='Unnamed: 0')
-X_train = drop_column(X_train, col_name='Quakers')
-X_train = fill_missing_values(X_train)
+train_df = fix_airport(train_df)
+train_airport_df = merge_airports(train_df, airports)
+
+# create all featrues for firstly more insights
+train_airport_df = create_feature(train_airport_df)
+train_airport_df = lat_lon_distance(train_airport_df)
+
+# List of dropping feature for classification
+drop_features_class = [
+    "DATOP",
+    "ID",
+    "FLTID",
+    "STD",
+    "STA",
+    "target",
+    "icao_DEP",
+    "iata_DEP",
+    "name_DEP",
+    "city_DEP",
+    "subd_DEP",
+    "country_DEP",
+    "elevation_DEP",
+    "lat_DEP",
+    "lon_DEP",
+    "tz_DEP",
+    "icao_ARR",
+    "iata_ARR",
+    "name_ARR",
+    "city_ARR",
+    "subd_ARR",
+    "country_ARR",
+    "elevation_ARR",
+    "lat_ARR",
+    "lon_ARR",
+    "tz_ARR",
+    "arr_hour",
+    "flight_month",
+    "delay_or_onTime",
+    "delayed",
+]
+
+
+# Feature and target variable for Classification modelling
+train_airport_df = drop_rows(train_airport_df)
+X_class = drop_column(train_airport_df, drop_features_class)
+y_class = train_airport_df["delayed"]
+print("==================")
+print("Training data for classification: {}".format(X_class.shape[0]))
+print("Test data for classification: {}".format(y_class.shape[0]))
+# Split the 'features' and 'target' data into training and testing sets for classification
+X_train_class, X_test_class, y_train_class, y_test_class = train_test_split(
+    X_class, y_class, test_size=0.2, stratify=y_class, random_state=RSEED
+)
+
+# resetting indices
+reset_indices(X_train_class, X_test_class)
+
+# Creating list for categorical predictors/features
+# (dates are also objects so if you have them in your data you would deal with them first)
+cat_features = [
+    "DEPSTN",
+    "ARRSTN",
+    "STATUS",
+    "AC",
+    "domestic",
+    "dep_hour",
+    "dep_weekday",
+    "flight_month_name",
+    "year",
+]
+
+num_features = ["duration_min", "distance"]
+
+# Initialize a scaler, then apply it to the features
+scaler_class = StandardScaler()
+scaler_class.fit(X_train_class[num_features])
+X_train_class[num_features] = scaler_class.transform(X_train_class[num_features])
+X_test_class[num_features] = scaler_class.transform(X_test_class[num_features])
+
+# Rename the columns from the Encoded df
+col = OneHotEncoder_labels(X_train_class, cat_features)
+
+# One-hot encode the 'features' data using sklearn OneHotEncoder to Encode categorical features as a one-hot numeric array.
+encoder_class = OneHotEncoder(handle_unknown="ignore", sparse=False, drop="first")
+encoder_class.fit(X_train_class[cat_features])
+
+# Fit OneHotEncoder to X, then transform X. Here Train Data
+X_train_dummie_columns = pd.DataFrame(
+    encoder_class.transform(X_train_class[cat_features])
+)
+X_train_class = X_train_class.drop(cat_features, axis=1)
+X_train_class = X_train_class.join(X_train_dummie_columns)
+X_train_class.columns = col
+
+# Fit OneHotEncoder to X, then transform X. Here Test Data
+X_test_dummie_columns = pd.DataFrame(
+    encoder_class.transform(X_test_class[cat_features])
+)
+X_test_class = X_test_class.drop(cat_features, axis=1)
+X_test_class = X_test_class.join(X_test_dummie_columns)
+X_test_class.columns = col
+
+## in order to exemplify how the predict will work.. we will save the y_train
+print("Saving test data in the data folder")
+X_test_class.to_csv("data/X_test.csv", index=False)
+y_test_class.to_csv("data/y_test.csv", index=False)
 
 # model
-print("Training a simple linear regression")
-reg = LinearRegression().fit(X_train, y_train)
-y_train_pred = reg.predict(X_train)
-mse_train = mean_squared_error(y_train, y_train_pred)
+print("Training a Support Vector Classifier")
+# Initialize the SVC classifier
+SVC_clf = SVC(kernel="rbf", cache_size=1000, C=10, gamma=0.06).fit(
+    X_train_class, y_train_class
+)
+y_train__class_pred = SVC_clf.predict(X_train_class)
+f1_scores = f1_score(y_train_class, y_train__class_pred, average="macro")
 
-#feature eng on test data
-print("Feature engineering on test")
-X_test = transform_altitude(X_test)
-X_test = drop_column(X_test, col_name='Unnamed: 0')
-X_test = drop_column(X_test, col_name='Quakers')
-X_test = fill_missing_values(X_test)
+y_test_pred_class = SVC_clf.predict(X_test_class)
+f1_scores_test = f1_score(y_test_class, y_test_pred_class, average="macro")
 
-y_test_pred = reg.predict(X_test)
-mse_test = mean_squared_error(y_test, y_test_pred)
 
-print (f"MSE on train is: {mse_train}")
-print (f"MSE on test is: {mse_test}")
-print("this is obviously fishy")
-#saving the model
+print(f"F1 macro on train is: {f1_scores}")
+print(f"F1 macro on test is: {f1_scores_test}")
+print("Model training completed")
+# saving the model
 print("Saving model in the model folder")
-filename = 'models/linear_regression_model.sav'
-pickle.dump(reg, open(filename, 'wb'))
+filename = "models/SVC_model.sav"
+pickle.dump(SVC_clf, open(filename, "wb"))

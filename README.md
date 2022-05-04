@@ -4,6 +4,13 @@ Predict airline delays for Tunisian aviation company, Tunisair
 
 ---
 
+## Authors: 
+* [Malin Soetbeer](https://github.com/MalinSoetbeer)
+         
+* [Malte Barkowski](https://github.com/MBarkowski)
+
+* [Evans Witte](https://github.com/evanswitte)
+
 ## The data
 
 Flight Data:

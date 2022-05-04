@@ -109,8 +109,16 @@ def drop_column(df: pd.DataFrame, cols_to_drop: list) -> pd.DataFrame:
     Returns:
         pd.DataFrame: dataframe with dropped columns
     """
-    df2 = df.drop(cols_to_drop, axis=1, inplace=False)
+
+    df2 = df.drop(cols_to_drop, axis=1)
     return df2
+
+
+def drop_rows(df):
+
+    df3 = df.drop(df[df.DEPSTN == df.ARRSTN].index)
+
+    return df3
 
 
 def reset_indices(*args):
